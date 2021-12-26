@@ -15,9 +15,10 @@
       "all_frames": true
     }
   ],
-  "web_accessible_resources": [
-    "todoist-shortcuts.js"
-  ],
+  "web_accessible_resources": [{
+    "resources": ["todoist-shortcuts.js"],
+    "matches": ["<all_urls>"]
+  }],
   "icons": {
     "128": "icon128.png"
   },
@@ -26,6 +27,8 @@
       "128": "icon128.png"
     }
   },
-  "content_security_policy": "default-src 'self'",
-  "manifest_version": 2
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'"
+  },
+  "manifest_version": 3
 }
