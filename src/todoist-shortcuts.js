@@ -2695,23 +2695,6 @@
     }
   }
 
-  // Generic retry with delay between retries - returns a Promise
-  async function retryWithDelay(taskName, task, fuel = 100, delay = 10) {
-    while (fuel > 0) {
-      const result = task();
-      if (result) {
-        return result;
-      }
-      await sleep(delay);
-      fuel -= 1;
-    }
-    throw new Error('Ran out of retries while ' + taskName);
-  }
-
-  async function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   async function blurSchedulerInput() {
     enterDeferLastBinding();
     await sleep(IS_SAFARI ? 20 : 0);
@@ -4202,6 +4185,29 @@
     for (const element of elements) {
       click(element);
     }
+  }
+
+  // Generic retry with delay between retries - returns a Promise
+  async function retryWithDelay(
+      taskName, task, fuel = 100, delay = 10, instantFuel = 10) {
+    while (instantFuel > 0 && fuel > 0) {
+      const result = task();
+      if (result) {
+        return result;
+      }
+      if (instantFuel > 0) {
+        await sleep(0);
+        instantFuel -= 1;
+      } else {
+        await sleep(delay);
+        fuel -= 1;
+      }
+    }
+    throw new Error('Ran out of retries while ' + taskName);
+  }
+
+  async function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Users querySelectorAll, requires unique result, and applies the
