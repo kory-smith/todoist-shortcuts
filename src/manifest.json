@@ -3,23 +3,26 @@
   "short_name": "Todoist Keys",
   "author": "Michael Sloan",
   "description": "Adds a comprehensive suite of keyboard shortcuts to Todoist. More info: https://github.com/mgsloan/todoist-shortcuts",
-  "version": "203",
+  "version": "204",
   "homepage_url": "https://github.com/mgsloan/todoist-shortcuts",
   "content_scripts": [
     {
-      "matches":
-        [ "https://todoist.com/app*"
-        , "https://*.todoist.com/app*"
-        ],
+      "matches": ["https://todoist.com/app*", "https://*.todoist.com/app*"],
       "js": ["common.js", "inject.js"],
       "all_frames": true
     }
   ],
   "permissions": ["storage"],
-  "web_accessible_resources": [{
-    "resources": ["mousetrap.js", "todoist-shortcuts.js", "options-page.html"],
-    "matches": ["<all_urls>"]
-  }],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "mousetrap.js",
+        "todoist-shortcuts.js",
+        "options-page.html"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
     "128": "icon128.png"
   },

@@ -1,5 +1,15 @@
 # todoist-shortcuts changelog
 
+## Version 204
+
+* Works around very strange Todoist behavior for ctrl-click multi
+  selection. Unfortunately the fix for this is to deselect everything
+  and reselect every time the selection changes, so this causes a bit
+  of flicker. See [#281][].
+
+[#281]: https://github.com/mgsloan/todoist-shortcuts/issues/281
+
+
 ## Version 203
 
 * Fixed a bunch of brokenness related to Todoist no longer making
