@@ -397,7 +397,7 @@
 
   // Toggles selection of the task focused by the cursor.
   async function toggleSelect() {
-    toggleSelectTask(requireCursor());
+    await toggleSelectTask(requireCursor());
   }
 
   // Selects the task focused by the cursor.
@@ -688,7 +688,7 @@
         }
       }
       if (modified) {
-        setSelections(selected);
+        await setSelections(selected);
       }
     };
   }
@@ -837,19 +837,37 @@
 
   // Selects all tasks, even those hidden by collapsing.
   async function selectAllTasks() {
+    /* Old definition before hacks to fix Todoist behavioral regressions (#281)
     const allTasks = getTasks('include-collapsed');
     for (let i = 0; i < allTasks.length; i++) {
       setTimeout(() => selectTask(allTasks[i]));
     }
+    */
+
+    const selections = {};
+    for (const task of getTasks('include-collapsed')) {
+      selections[getTaskKey(task)] = true;
+    }
+    await setSelections(selections);
   }
 
   // Selects all overdue tasks.
   async function selectAllOverdue() {
+    /* Old definition before hacks to fix Todoist behavioral regressions (#281)
     for (const task of getTasks()) {
       if (getUnique(task, '.date_overdue')) {
         setTimeout(() => selectTask(task));
       }
     }
+    */
+
+    const selections = {};
+    for (const task of getTasks()) {
+      if (getUnique(task, '.date_overdue')) {
+        selections[getTaskKey(task)] = true;
+      }
+    }
+    await setSelections(selections);
   }
 
   async function selectSection() {
@@ -858,11 +876,13 @@
       return;
     }
     const section = getSection(cursor);
+    const selections = {};
     for (const task of getTasks()) {
       if (getSection(task) === section) {
-        setTimeout(() => selectTask(task));
+        selections[getTaskKey(task)] = true;
       }
     }
+    await setSelections(selections);
   }
 
   async function addTaskBottom() {
@@ -1562,16 +1582,37 @@
     return withUnique(document, '#content', all, f);
   }
 
-  function toggleSelectTask(task) {
+  async function toggleSelectTask(task) {
+    const selectedTasks = getTasks().filter(checkTaskIsSelected);
+    if (selectedTasks.length > 0) {
+      deselectAllTasks();
+      await sleep(0);
+      let wasAlreadySelected = false;
+      for (const selectedTask of selectedTasks) {
+        if (selectedTask === task) {
+          wasAlreadySelected = true;
+          continue;
+        }
+        controlClickTask(selectedTask);
+      }
+      if (wasAlreadySelected) {
+        return;
+      }
+    }
+    controlClickTask(task);
+  }
+
+  function controlClickTask(task) {
     // Control click toggles selection state.
-    const isMacOS = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const e = isMacOS ?
-      new MouseEvent('click', {bubbles: true, metaKey: true}) :
-      new MouseEvent('click', {bubbles: true, ctrlKey: true});
+    //
+    // Unfortunately wacky todoist bugs makes this clear existing selections etc
+    // for inscrutable reasons..
+    const e = new MouseEvent(
+        'click',
+        {bubbles: true, ctrlKey: true, metaKey: true});
     withUnique(task, '.task_content', all, (content) => {
       content.dispatchEvent(e);
     });
-    task.dispatchEvent(e);
   }
 
   function selectTask(task) {
@@ -1588,7 +1629,18 @@
 
   // Ensures that the specified task ids are selected (specified by a set-like
   // object).
-  function setSelections(selections) {
+  async function setSelections(selections) {
+    deselectAllTasks();
+    await sleep(0);
+    for (const key in selections) {
+      const task = getTaskByKey(key);
+      if (task) {
+        controlClickTask(task);
+      }
+    }
+
+    /* Old definition before hacks to fix Todoist behavioral regressions (#281)
+
     const allTasks = getTasks('include-collapsed');
     for (const task of allTasks) {
       const key = getTaskKey(task);
@@ -1600,6 +1652,7 @@
         }
       });
     }
+    */
   }
 
   function getSelectedTasksOrCursor() {
@@ -2130,12 +2183,12 @@
   // like priority changes. This restores the selections.
   //
   // eslint-disable-next-line no-unused-vars
-  function withRestoredSelections(f) {
+  async function withRestoredSelections(f) {
     const oldSelections = getSelectedTaskKeys();
     try {
       f();
     } finally {
-      setSelections(oldSelections);
+      await setSelections(oldSelections);
     }
   }
 
