@@ -3936,7 +3936,12 @@
   }
 
   function scrollTaskIntoView(task) {
-    task.scrollIntoView({block: 'nearest', behavior: 'instant'});
+    const rect = task.getBoundingClientRect();
+    const aboveViewport = rect.top < rect.height;
+    const belowViewport = rect.bottom > window.innerHeight;
+    if (aboveViewport || belowViewport) {
+      task.scrollIntoView({block: 'center', behavior: 'instant'});
+    }
   }
 
   function scrollTaskToBottom(task) {
