@@ -416,15 +416,24 @@
   // WHAT_CURSOR_APPLIES_TO is 'all' or 'most', then instead applies to the
   // cursor if there is no selection.
   async function schedule() {
-    const mutateCursor = getCursorToMutate();
-    if (mutateCursor) {
-      await clickTaskSchedule(mutateCursor);
-      await blurSchedulerInput();
-    } else {
-      clickUniqueRetrying(
-          document,
-          'button[data-action-hint="multi-select-toolbar-scheduler"]');
-      await blurSchedulerInput();
+    // Enter defer mode immediately to capture any quick follow-up keystrokes
+    // (e.g., pressing 'c' quickly after 't' to schedule to today). Without
+    // this, the keystroke could be typed into the scheduler input before
+    // blurSchedulerInput() has a chance to defer it.
+    enterDeferLastBinding();
+    try {
+      const mutateCursor = getCursorToMutate();
+      if (mutateCursor) {
+        await clickTaskSchedule(mutateCursor);
+        await blurSchedulerInput(false);
+      } else {
+        clickUniqueRetrying(
+            document,
+            'button[data-action-hint="multi-select-toolbar-scheduler"]');
+        await blurSchedulerInput(false);
+      }
+    } finally {
+      exitDeferLastBinding();
     }
   }
 
@@ -473,16 +482,22 @@
   async function openDeadline() {
     const mutateCursor = getCursorToMutate();
     if (mutateCursor) {
-      clickTaskEdit(mutateCursor);
-      await clickAllRetrying(document, '[aria-label="Set deadline"]');
-      // Todoist seems to put back the focus, so try a few times to blur.
-      await blurSchedulerInput();
-      sleep(20);
-      await blurSchedulerInput();
-      sleep(50);
-      await blurSchedulerInput();
-      sleep(100);
-      await blurSchedulerInput();
+      // Enter defer mode immediately to capture quick follow-up keystrokes
+      enterDeferLastBinding();
+      try {
+        clickTaskEdit(mutateCursor);
+        await clickAllRetrying(document, '[aria-label="Set deadline"]');
+        // Todoist seems to put back the focus, so try a few times to blur.
+        await blurSchedulerInput(false);
+        await sleep(20);
+        await blurSchedulerInput(false);
+        await sleep(50);
+        await blurSchedulerInput(false);
+        await sleep(100);
+        await blurSchedulerInput(false);
+      } finally {
+        exitDeferLastBinding();
+      }
     }
   }
 
@@ -1424,8 +1439,14 @@
   }
 
   async function taskViewSchedule() {
-    taskViewScheduleText();
-    await blurSchedulerInput();
+    // Enter defer mode immediately to capture quick follow-up keystrokes
+    enterDeferLastBinding();
+    try {
+      taskViewScheduleText();
+      await blurSchedulerInput(false);
+    } finally {
+      exitDeferLastBinding();
+    }
   }
 
   async function taskViewScheduleText() {
@@ -2695,8 +2716,8 @@
     }
   }
 
-  async function blurSchedulerInput() {
-    enterDeferLastBinding();
+  async function blurSchedulerInput(manageDefer = true) {
+    if (manageDefer) enterDeferLastBinding();
     await sleep(IS_SAFARI ? 20 : 0);
     try {
       const focusedEl = await retryWithDelay(
@@ -2710,7 +2731,7 @@
       );
       focusedEl.blur();
     } finally {
-      exitDeferLastBinding();
+      if (manageDefer) exitDeferLastBinding();
     }
   }
 
