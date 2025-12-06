@@ -297,13 +297,13 @@
 
   // Move the cursor up and down.
   async function cursorDown() {
-    const cursorChanged = modifyCursorIndex((ix) => ix + 1);
+    const cursorChanged = await modifyCursorIndex((ix) => ix + 1);
     if (!cursorChanged && isUpcomingView()) {
       scrollTaskToTop(getCursor());
     }
   }
   async function cursorUp() {
-    const cursorChanged = modifyCursorIndex((ix) => ix - 1);
+    const cursorChanged = await modifyCursorIndex((ix) => ix - 1);
     if (!cursorChanged && isUpcomingView()) {
       info('scrolling task to bottom');
       scrollTaskToBottom(getCursor());
@@ -312,13 +312,13 @@
 
   // Move the cursor to first / last task.
   async function cursorFirst() {
-    disabledWithLazyLoading('Cursoring first task', () => {
-      setCursorToFirstTask('scroll');
+    await disabledWithLazyLoading('Cursoring first task', async () => {
+      await setCursorToFirstTask('scroll');
     });
   }
   async function cursorLast() {
-    disabledWithLazyLoading('Cursoring last task', () => {
-      setCursorToLastTask('scroll');
+    await disabledWithLazyLoading('Cursoring last task', async () => {
+      await setCursorToLastTask('scroll');
     });
   }
 
@@ -893,6 +893,13 @@
     if (viewMode === 'agenda') {
       quickAdd();
     } else {
+      // Scroll to top first to ensure first tasks are loaded
+      // in case of virtual scrolling
+      const content = getViewContent();
+      if (content && content.scrollTop > 0) {
+        content.scrollTo(0, 0);
+        await sleep(50);
+      }
       const tasks = getTasks();
       if (tasks.length > 0) {
         await addAboveTask(tasks[0]);
@@ -3905,7 +3912,16 @@
    */
 
   // Sets the cursor to the first task, if any exists.
-  function setCursorToFirstTask(shouldScroll) {
+  // When shouldScroll is 'scroll', scrolls to top first to ensure first tasks
+  // are loaded in case of virtual scrolling.
+  async function setCursorToFirstTask(shouldScroll) {
+    if (shouldScroll === 'scroll') {
+      const content = getViewContent();
+      if (content && content.scrollTop > 0) {
+        content.scrollTo(0, 0);
+        await sleep(50);
+      }
+    }
     const tasks = getTasks();
     if (tasks.length > 0) {
       setCursor(tasks[0], shouldScroll);
@@ -3913,7 +3929,19 @@
   }
 
   // Sets the cursor to the last task, if any exists.
-  function setCursorToLastTask(shouldScroll) {
+  // When shouldScroll is 'scroll', scrolls to bottom first to ensure last tasks
+  // are loaded in case of virtual scrolling.
+  async function setCursorToLastTask(shouldScroll) {
+    if (shouldScroll === 'scroll') {
+      const content = getViewContent();
+      if (content) {
+        const scrollBottom = content.scrollHeight - content.clientHeight;
+        if (content.scrollTop < scrollBottom - 10) {
+          content.scrollTo(0, scrollBottom);
+          await sleep(50);
+        }
+      }
+    }
     const tasks = getTasks();
     if (tasks.length > 0) {
       setCursor(tasks[tasks.length - 1], shouldScroll);
@@ -3971,7 +3999,7 @@
   }
 
   // A functional-ish idiom to reduce boilerplate.
-  function modifyCursorIndex(f) {
+  async function modifyCursorIndex(f) {
     const tasks = getTasks();
     let cursor = getCursor();
     if (!cursor) {
@@ -3982,7 +4010,7 @@
     let cursorChanged = false;
     if (!cursor) {
       info('Couldn\'t find cursor, so cursoring first task.');
-      setCursorToFirstTask('scroll');
+      await setCursorToFirstTask('scroll');
       cursorChanged = true;
     } else {
       const cursorIndex = tasks.indexOf(cursor);
@@ -3990,7 +4018,7 @@
         error(
             'Invariant violation: couldn\'t find', cursor, 'in', tasks,
             ', so aborting modifyCursorIndex');
-        cursorFirst();
+        await cursorFirst();
         return false;
       }
       let newIndex = f(cursorIndex, tasks);
@@ -4799,13 +4827,13 @@
     return getUnique(document, '.upcoming_view') !== null;
   }
 
-  function disabledWithLazyLoading(actionName, f) {
+  async function disabledWithLazyLoading(actionName, f) {
     if (isUpcomingView()) {
       warn(actionName, ' disabled in upcoming view, ',
           'as it doesn\'t work properly due to lazy loading.');
       return;
     } else {
-      f();
+      await f();
     }
   }
 
