@@ -16,15 +16,19 @@
   // Here's where the keybindings get specified. Of course, feel free to modify
   // this list, or modify this script in general.
   //
-  // MINIMAL VERSION: Only g/G navigation + o/O (using native cursor)
+  // MINIMAL VERSION: Only g navigation + o/O (using native cursor)
   const KEY_BINDINGS = [
     // Navigation
     ['g', navigate],
-    ['G', navigateToTask],
 
-    // Add tasks above/below native selected task
+    // Add tasks above/below native focused task
     ['shift+o', addAbove],
     ['o', addBelow],
+
+    // Utility
+    ['shift+enter', followLink],
+    ['ctrl+,', copyCursorOrSelectedTitles],
+    ['ctrl+.', copyFirstLinkUrl],
   ];
   const DEFAULT_KEYMAP = 'default';
 
@@ -311,6 +315,20 @@
         }
       } else {
         info('Didn\'t find a link to click.');
+      }
+    });
+  }
+
+  // Copy the first link URL from the focused task to clipboard
+  async function copyFirstLinkUrl() {
+    const contentQuery = '.task_list_item__content';
+    withUnique(requireCursor(), contentQuery, all, (content) => {
+      const link = getFirst(content, 'a');
+      if (link && link.href) {
+        setClipboard(link.href);
+        info('Copied link: ' + link.href);
+      } else {
+        info('Didn\'t find a link to copy.');
       }
     });
   }
