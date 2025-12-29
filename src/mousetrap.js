@@ -631,7 +631,10 @@
                 return;
             }
 
-            if (callback(e, combo) === false) {
+            var result = callback(e, combo);
+            console.log('mousetrap: callback for', combo, 'returned', result, 'type:', typeof result);
+            if (result === false) {
+                console.log('mousetrap: calling preventDefault and stopPropagation');
                 _preventDefault(e);
                 _stopPropagation(e);
             }
@@ -651,6 +654,7 @@
             var doNotReset = {};
             var maxLevel = 0;
             var processedSequenceCallback = false;
+            var handledKey = false;
 
             var callbackMap = self._callbacks[self._currentKeymap];
             if (callbacks.length === 0 && callbackMap) {
@@ -690,6 +694,7 @@
                     }
 
                     processedSequenceCallback = true;
+                    handledKey = true;
 
                     // keep a list of which sequences were matches for later
                     doNotReset[callbacks[i].seq] = 1;
@@ -700,6 +705,7 @@
                 // if there were no sequence matches but we are still here
                 // that means this is a regular match so we should fire that
                 if (!processedSequenceCallback) {
+                    handledKey = true;
                     _fireCallback(callbacks[i].callback, e, callbacks[i].combo);
                 }
             }
@@ -731,6 +737,8 @@
             }
 
             _ignoreNextKeypress = processedSequenceCallback && e.type == 'keydown';
+
+            return handledKey;
         };
 
         /**
@@ -751,16 +759,16 @@
 
             // no character found then stop
             if (!character) {
-                return;
+                return false;
             }
 
             // need to use === for the character check because the character can be 0
             if (e.type == 'keyup' && _ignoreNextKeyup === character) {
                 _ignoreNextKeyup = false;
-                return;
+                return false;
             }
 
-            self.handleKey(character, _eventModifiers(e), e);
+            return self.handleKey(character, _eventModifiers(e), e);
         }
 
         /**

@@ -2,7 +2,7 @@
 
 (function() {
   // Set this to true to get more log output.
-  const DEBUG = false;
+  const DEBUG = true;
 
   const IS_CHROME =
     /Chrom/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
@@ -10,102 +10,22 @@
   const IS_SAFARI =
     /Safari/.test(navigator.userAgent) && /Apple/.test(navigator.vendor);
 
-  // Cursor navigation.
-  const CURSOR_BINDINGS = [
-    [['j', 'down'], cursorDown],
-    [['k', 'up'], cursorUp],
-    [['h', 'left'], cursorLeft],
-    [['l', 'right'], cursorRight],
-    ['^', cursorFirst],
-    ['$', cursorLast],
-    ['{', cursorUpSection],
-    ['}', cursorDownSection],
-  ];
+  // Cursor bindings removed - using native Todoist cursor handling
+  const CURSOR_BINDINGS = [];
 
   // Here's where the keybindings get specified. Of course, feel free to modify
   // this list, or modify this script in general.
-  const KEY_BINDINGS = [].concat(CURSOR_BINDINGS, [
-
+  //
+  // MINIMAL VERSION: Only g/G navigation + o/O (using native cursor)
+  const KEY_BINDINGS = [
     // Navigation
     ['g', navigate],
     ['G', navigateToTask],
-    ['`', nextLeftMenuItem],
-    ['shift+`', prevLeftMenuItem],
 
-    // Manipulation of tasks at cursor
-    ['enter', edit],
-    ['shift+enter', followLink],
+    // Add tasks above/below native selected task
     ['shift+o', addAbove],
     ['o', addBelow],
-    ['a', addTaskBottom],
-    ['shift+a', addTaskTop],
-    ['i', openTaskView],
-    ['c', openComments],
-    ['shift+r', openReminders],
-    ['+', openAssign],
-    ['>', openDeadline],
-    [['shift+j', 'shift+down'], moveDown],
-    [['shift+k', 'shift+up'], moveUp],
-    [['shift+h', 'shift+left'], moveOut],
-    [['shift+l', 'shift+right'], moveIn],
-
-    // Selection
-    ['x', toggleSelect],
-    ['* a', selectAllTasks],
-    ['* n', deselectAllTasks],
-    ['* o', selectAllOverdue],
-    ['* s', selectSection],
-    ['* 1', selectPriority('1')],
-    ['* 2', selectPriority('2')],
-    ['* 3', selectPriority('3')],
-    [['* 4', '* 0'], selectPriority('4')],
-    [['* h', '* left'], collapseAll],
-    [['* l', '* right'], expandAll],
-
-    // Manipulation of selected tasks
-    ['t', schedule],
-    ['shift+t', scheduleText],
-    ['alt+t', scheduleTime],
-    ['d', done],
-    [['e', '#'], deleteTasks],
-    ['&', duplicateTasks],
-    ['v', moveToProject],
-    [['y', '@'], openLabelMenu],
-    ['1', setPriority('4')],
-    ['2', setPriority('3')],
-    ['3', setPriority('2')],
-    [['4', '0'], setPriority('1')],
-    ['shift+c', toggleTimer],
-
-    // Projects
-    //
-    // Disabled as it's broken
-    // ['shift+p', openCurrentProjectLeftNavMenu],
-
-    // Bulk reschedule / move modes were removed
-    ['* t', notifyBulkActionsRemoved],
-    ['* v', notifyBulkActionsRemoved],
-
-    // Other
-
-    [['u', 'z', 'ctrl+z'], undo],
-
-    ['q', quickAdd],
-    ['m', toggleLeftNav],
-    [['f', '/'], focusSearch],
-    ['!', openNotifications],
-    ['?', openHelpModal],
-    ['ctrl+s', sync],
-    ['ctrl+k', openCommandMenu],
-    ['ctrl+shift+,', copyCursorOrSelectedUrls],
-    ['ctrl+,', copyCursorOrSelectedTitles],
-    ['ctrl+c', copyCursorOrSelectedAsMarkdown],
-    ['ctrl+shift+/', openRandomTask],
-    ['w', openMoreActionsMenu],
-
-    // See https://github.com/mgsloan/todoist-shortcuts/issues/30
-    // [???, importFromTemplate],
-  ]);
+  ];
   const DEFAULT_KEYMAP = 'default';
 
   // Build cursor movement bindings that can be used in schedule mode
@@ -580,18 +500,32 @@
   // Clicks 'Move to project' for the selection. If WHAT_CURSOR_APPLIES_TO is
   // 'all' or 'most', then instead applies to the cursor if there is no
   // selection.
-  async function moveToProject() {
+  function moveToProject() {
+    debug('moveToProject() called');
     const mutateCursor = getCursorToMutate();
+    debug('mutateCursor =', mutateCursor);
     if (mutateCursor) {
-      await clickTaskMenu(
-          mutateCursor,
-          'task-overflow-menu-move-to-project',
-          false);
+      debug('moveToProject: using cursor path');
+      // Use async IIFE for the await, but return false synchronously
+      (async () => {
+        await clickTaskMenu(
+            mutateCursor,
+            'task-overflow-menu-move-to-project',
+            false);
+      })();
     } else {
-      clickUnique(
-          document,
-          'button[data-action-hint="multi-select-toolbar-project-picker"]');
+      debug('moveToProject: using multi-select toolbar path - delaying click');
+      // Delay click to let keydown event fully complete
+      setTimeout(() => {
+        const btn = document.querySelector('button[data-action-hint="multi-select-toolbar-project-picker"]');
+        debug('moveToProject: found button =', btn);
+        if (btn) {
+          btn.click();
+          debug('moveToProject: click done');
+        }
+      }, 0);
     }
+    return false; // Prevent event propagation to Todoist's native handler
   }
 
   // Clicks 'Move to project' for the selection, and moves to the
@@ -911,12 +845,33 @@
   // Add a task above / below cursor. Unfortunately these options do not exist
   // in agenda mode, so in that case, instead it is added to the current
   // section.
+  // Get the natively selected task (using Todoist's native cursor)
+  function getNativeSelectedTask() {
+    const tasks = getTasks();
+    for (const task of tasks) {
+      if (checkTaskIsSelected(task)) {
+        return task;
+      }
+    }
+    return null;
+  }
+
   async function addAbove() {
-    await addAboveTask(getCursor());
+    const task = getNativeSelectedTask();
+    if (task) {
+      await addAboveTask(task);
+    } else {
+      info('No task selected - use arrow keys to select a task first');
+    }
   }
 
   async function addBelow() {
-    await addBelowTask(getCursor());
+    const task = getNativeSelectedTask();
+    if (task) {
+      await addBelowTask(task);
+    } else {
+      info('No task selected - use arrow keys to select a task first');
+    }
   }
 
   // Open comments sidepane
@@ -1706,85 +1661,31 @@
         'mouseGotMoved =', mouseGotMoved);
   }
 
+  // DISABLED: Extension cursor context storage - using native Todoist cursor
   function storeNormalContext(cursor) {
-    const tasks = getTasks();
-    const index = tasks.indexOf(cursor);
-    if (index < 0) {
-      clearEditingContext(tasks);
-    } else {
-      storeCursorContext(cursor, tasks, index, TYPE_NORMAL);
-    }
+    // No-op
   }
 
   function storeImplicitEditingContext(cursor, index) {
-    // Do not overwrite an explicitly stored cursor position.
-    if (lastCursorType !== TYPE_EXPLICIT_EDITING) {
-      storeCursorContext(cursor, getTasks(), index, TYPE_IMPLICIT_EDITING);
-    }
+    // No-op
   }
 
   function storeExplicitEditingContext(cursor) {
-    const tasks = getTasks();
-    const index = tasks.indexOf(cursor);
-    if (index < 0) {
-      clearEditingContext(tasks);
-    } else {
-      storeCursorContext(cursor, tasks, index, TYPE_EXPLICIT_EDITING);
-    }
+    // No-op
   }
 
   function clearEditingContext(tasks) {
-    lastCursorTasks = tasks;
-    lastCursorIndex = -1;
-    lastCursorId = null;
-    lastCursorIndent = null;
-    lastCursorSection = null;
-    lastCursorType = TYPE_NORMAL;
-    debugCursorContext('Cleared cursor context');
+    // No-op
   }
 
+  // DISABLED: Extension mouse-based cursor tracking - using native Todoist cursor
   function handleMouseMove(ev) {
-    if (ev.isTrusted) {
-      mouseGotMoved = true;
-    } else {
-      // Synthetic mouse move events are generated when dragging
-      // tasks.
-      debug('handleMouseMove ignoring synthetic mouse move event.');
-    }
+    // No-op
   }
 
   function handleMouseOver(ev) {
-    if (!ev.isTrusted) {
-      // Synthetic mouse move events are generated when dragging
-      // tasks.
-      debug('handleMouseOver ignoring synthetic mouse hover event.');
-      return;
-    }
     try {
-      const predicate = matchingClass('task_list_item');
-      const hoveredTask = findParent(ev.target, predicate);
-      if (mouseGotMoved && hoveredTask) {
-        const mouseBehavior = getMouseBehaviorOption();
-        switch (mouseBehavior) {
-          case 'focus-follows-mouse':
-            break;
-          case 'focus-follows-mouse-delay-after-window-focus':
-            if (windowRecentlyFocused) {
-              debug('Not setting cursor on mouse move, ',
-                  'because window was recently focused.');
-              return;
-            }
-            break;
-          case 'no-mouse-behavior':
-            debug('Not setting cursor on mouse move (disabled in settings).');
-            return;
-          default:
-            warn('Unrecognized mouse behavior option: ', mouseBehavior);
-            break;
-        }
-        debug('Due to mouse hover, setting cursor');
-        setCursor(hoveredTask, 'no-scroll');
-      }
+      // No-op - using native Todoist cursor
     } finally {
       mouseGotMoved = false;
     }
@@ -1801,191 +1702,22 @@
     }, 500);
   }
 
-  // If the cursor exists, set 'lastCursorTasks' / 'lastCursorIndex'. If it
-  // doesn't exist, then use previously stored info to place it after its prior
-  // location.
+  // DISABLED: Extension cursor tracking - using native Todoist cursor
   function ensureCursor(content) {
-    content = content || getViewContent();
-    // If there's an editor open to add a task, then set the cursor to the item
-    // above.
-    const manager = getUnique(content, '.manager');
-    if (manager) {
-      const tasks = getTasks('no-collapsed', 'include-editors');
-      const managerIndex =
-            tasks.findIndex((task) => task.classList.contains('manager'));
-      debug('there is an active editor, with index', managerIndex);
-      if (managerIndex > 0) {
-        storeImplicitEditingContext(tasks[managerIndex - 1], true);
-      } else if (managerIndex < 0) {
-        error('There seems to be a task editor, but then couldn\'t find it.');
-      }
-      return;
-    }
-    debug('Checking if cursor still exists:', lastCursorId, lastCursorIndent);
-    const cursor = getCursor();
-    // Detect if the cursor has changed section. This can happen when the user
-    // re-schedules it or moves it to a different project. I find it nicer if
-    // the cursor doesn't follow the task for these moves, hence this logic.
-    let changedSection = false;
-    let currentSection = null;
-    const cursorMovement = getCursorMovementOption();
-    if (cursor &&
-        cursorMovement === 'follows-task-within-section' &&
-        lastCursorType === TYPE_NORMAL) {
-      const cursorId = getTaskId(cursor);
-      const cursorIndent = getIndentClass(cursor);
-      if (lastCursorId === cursorId && lastCursorIndent === cursorIndent) {
-        currentSection = getSectionName(cursor);
-        debug(
-            'Cursor hasn\'t changed task:',
-            'currentSection = ', currentSection,
-            'lastCursorSection = ', lastCursorSection,
-            'id =', cursorId,
-            'indent =', cursorIndent);
-        changedSection = currentSection !== lastCursorSection;
-      }
-    }
-    if (cursor && !changedSection) {
-      if (lastCursorType !== TYPE_NORMAL) {
-        // This invocation is to handle the circumstance where the user inserts
-        // a task, moving the task list. The task under the mouse then gets
-        // hovered, even if the mouse wasn't moved, which erroneously changes
-        // the cursor.
-        debug(
-            'Was just editing, and mouse didn\'t move,',
-            'so restoring the cursor to last position.');
-        restoreLastCursor();
-      } else {
-        debug('Found normal cursor, so storing its context');
-        storeNormalContext(cursor);
-      }
-    } else {
-      if (changedSection) {
-        debug('cursor element changed section, finding new location');
-      } else {
-        debug('cursor element disappeared, finding new location');
-      }
-      restoreLastCursor();
-    }
+    // No-op
   }
 
+  // DISABLED: Extension cursor restoration - using native Todoist cursor
   function restoreLastCursor() {
-    debugCursorContext('restoring last cursor based on context:');
-    let found = false;
-    let tasks = null;
-    if (lastCursorIndex >= 0) {
-      if (lastCursorType === TYPE_IMPLICIT_EDITING) {
-        const taskPrecedingEditor =
-            getTaskById(lastCursorId, 'ignore-indent', lastCursorSection);
-        if (taskPrecedingEditor) {
-          tasks = getTasks();
-          for (let i = 0; i < tasks.length; i++) {
-            if (tasks[i] === taskPrecedingEditor && i + 1 < tasks.length) {
-              found = restoreCursor(tasks[i + 1], 'no-scroll');
-              if (found) {
-                debug('found task after task that preceded the editor.');
-              }
-              break;
-            }
-          }
-          if (!found) {
-            found = restoreCursor(taskPrecedingEditor, 'no-scroll');
-            if (found) {
-              debug('falling back on selecting task that preceded editor.');
-            }
-          }
-        } else {
-          warn('expected to find task that was being edited.');
-        }
-      } else if (lastCursorType === TYPE_EXPLICIT_EDITING) {
-        const task =
-            getTaskById(lastCursorId, 'ignore-indent', lastCursorSection);
-        if (task) {
-          found = restoreCursor(task, 'scroll');
-          if (found) {
-            debug('found task that was being explicitly edited.');
-          }
-        }
-      } else if (lastCursorType == TYPE_NORMAL) {
-        for (let i = lastCursorIndex; i < lastCursorTasks.length; i++) {
-          const oldTask = lastCursorTasks[i];
-          if (oldTask) {
-            const oldTaskId = getTaskId(oldTask);
-            task = getTaskById(oldTaskId, 'ignore-indent' );
-            if (task) {
-              if (i !== lastCursorIndex) {
-                found = restoreCursor(task, 'no-scroll');
-                if (found) {
-                  debug(
-                      'found still-existing task that is',
-                      i - lastCursorIndex,
-                      'tasks after old cursor position, at',
-                      lastCursorIndex,
-                      ', set cursor to it');
-                }
-                break;
-              } else {
-                debug('cursor changed section, finding new location');
-              }
-            }
-          }
-        }
-      } else {
-        error('Invalid value for lastCursorType: ', lastCursorType);
-      }
-    } else {
-      debug('lastCursorIndex wasn\'t set yet');
-    }
-    if (!found) {
-      debug('didn\'t find a particular task to select, so selecting by index.');
-      restoreCursorViaIndex(tasks);
-    }
+    // No-op
   }
 
   function restoreCursorViaIndex(tasks) {
-    if (!tasks) {
-      tasks = getTasks();
-    }
-
-    // Attempt to adjust index if cursored task is now earlier in the list.
-    let indexBasedOnLastCursor = lastCursorIndex;
-    const foundLastTaskEl =
-          getTaskById(lastCursorId, 'ignore-indent', lastCursorSection);
-    const foundLastTaskIndex = tasks.indexOf(foundLastTaskEl);
-    if (foundLastTaskIndex !== -1 &&
-        foundLastTaskIndex < indexBasedOnLastCursor) {
-      indexBasedOnLastCursor += 1;
-    }
-
-    if (0 <= indexBasedOnLastCursor && indexBasedOnLastCursor < tasks.length) {
-      debug('cursoring to index', indexBasedOnLastCursor);
-      setCursor(tasks[indexBasedOnLastCursor], 'no-scroll');
-    } else if (lastCursorIndex < tasks.length - lastCursorIndex) {
-      debug('cursoring first task, because it\'s nearer to lastCursorIndex.');
-      setCursorToFirstTask('no-scroll');
-    } else {
-      debug('cursoring last task, because it\'s nearer to lastCursorIndex.');
-      setCursorToLastTask('no-scroll');
-      if (!getCursor()) {
-        // This can happen if the last task is a nested sub-project.
-        debug('failed to set the cursor to last task, so setting to first');
-        setCursorToFirstTask('no-scroll');
-      }
-    }
+    // No-op
   }
 
   function restoreCursor(task, scroll) {
-    // Don't jump back to the same task if it changed section and
-    // cursor movement setting does not follow across sections
-    const taskSection = getSectionName(task);
-    const cursorMovement = getCursorMovementOption();
-    const changedSection =
-        cursorMovement === 'follows-task-within-section' &&
-        lastCursorSection !== taskSection;
-    if (!changedSection) {
-      setCursor(task, scroll);
-      return true;
-    }
+    // No-op
     return false;
   }
 
@@ -3920,19 +3652,9 @@
     }
   }
 
-  // Given the element for a task, set it as the current selection.
+  // DISABLED: Extension cursor handling removed - using native Todoist cursor
   function setCursor(task, shouldScroll) {
-    if (task) {
-      if (shouldScroll === 'scroll') {
-        scrollTaskIntoView(task);
-      } else if (shouldScroll !== 'no-scroll') {
-        error('Unexpected shouldScroll argument to setCursor:', shouldScroll);
-      }
-      storeNormalContext(task);
-      updateCursorStyle();
-    } else {
-      error('Null task passed to setCursor');
-    }
+    // No-op: using native Todoist cursor instead
   }
 
   function scrollTaskIntoView(task) {
@@ -3966,8 +3688,9 @@
   }
 
   // Returns the <li> element which corresponds to the current cursor.
+  // MODIFIED: Now returns the native Todoist selected task instead of extension cursor
   function getCursor() {
-    return getTaskById(lastCursorId, lastCursorIndent, lastCursorSection);
+    return getNativeSelectedTask();
   }
 
   // A functional-ish idiom to reduce boilerplate.
@@ -4363,10 +4086,9 @@
 
   // Simulate a mouse click.
   function click(el) {
-    const eventOptions = {bubbles: true, cancelable: true, view: window};
-    el.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-    el.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-    el.dispatchEvent(new MouseEvent('click', eventOptions));
+    debug('click() called on element:', el);
+    // Use native click method
+    el.click();
   }
 
   // Sum offsetTop / offsetLeft of all offsetParent to compute x / y.
@@ -4757,36 +4479,9 @@
     '}',
   ].join('\n'));
 
-  // A CSS style element, dynamically updated by updateCursorStyle. MUTABLE.
-  const cursorStyle = addCss('');
-
-  // This is unusual. Usually you would not dynamically generate CSS that uses
-  // different IDs. However, this is a nice hack in this case, because todoist
-  // frequently re-creates elements.
+  // DISABLED: Extension cursor styling removed - using native Todoist cursor
   function updateCursorStyle() {
-    const selecter = getKeySelecter(lastCursorId, lastCursorIndent);
-    cursorStyle.textContent = [
-      selecter + ' {',
-      '  border-left: 2px solid #4073d6;',
-      '  margin-left: -2px;',
-      '}',
-      // Oh man, I can't believe I'm doing this...
-      selecter + '[data-item-indent="2"] {',
-      '  margin-left: 26px;',
-      '}',
-      selecter + '[data-item-indent="3"] {',
-      '  margin-left: 54px;',
-      '}',
-      selecter + '[data-item-indent="4"] {',
-      '  margin-left: 82px;',
-      '}',
-      selecter + '[data-item-indent="5"] {',
-      '  margin-left: 110px;',
-      '}',
-      selecter + ' .sel_checkbox_td {',
-      '  padding-left: 2px;',
-      '}',
-    ].join('\n');
+    // No-op: using native Todoist cursor instead
   }
 
   // See comment on 'getTaskById' for explanation
@@ -4913,7 +4608,16 @@
     if (todoistModalIsOpen()) {
       return modalKeyHandler(ev);
     } else {
-      return mousetrap.handleKeyEvent(ev);
+      const handled = mousetrap.handleKeyEvent(ev);
+      // If mousetrap didn't handle the key, pass it to original Todoist handlers
+      if (!handled) {
+        if (ev.type === 'keypress' && window.originalTodoistKeypress) {
+          return window.originalTodoistKeypress.call(document, ev);
+        } else if (ev.type === 'keyup' && window.originalTodoistKeyup) {
+          return window.originalTodoistKeyup.call(document, ev);
+        }
+      }
+      return handled;
     }
   }
 
@@ -4980,7 +4684,12 @@
       lastDeferredEvent = ev;
       return false;
     } else {
-      return mousetrap.handleKeyEvent(ev);
+      const handled = mousetrap.handleKeyEvent(ev);
+      // If mousetrap didn't handle the key, pass it to original Todoist handler
+      if (!handled && window.originalTodoistKeydown) {
+        return window.originalTodoistKeydown.call(document, ev);
+      }
+      return handled;
     }
   }
 
