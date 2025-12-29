@@ -845,11 +845,11 @@
   // Add a task above / below cursor. Unfortunately these options do not exist
   // in agenda mode, so in that case, instead it is added to the current
   // section.
-  // Get the natively selected task (using Todoist's native cursor)
+  // Get the natively focused task (using Todoist's native j/k cursor)
   function getNativeSelectedTask() {
     const tasks = getTasks();
     for (const task of tasks) {
-      if (checkTaskIsSelected(task)) {
+      if (task.classList.contains('task_list_item--keyboard_shortcuts_active')) {
         return task;
       }
     }
