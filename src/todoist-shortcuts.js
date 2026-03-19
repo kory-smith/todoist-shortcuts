@@ -25,6 +25,10 @@
     ['shift+o', addAbove],
     ['o', addBelow],
 
+    // Jump to first/last task
+    ['shift+k', focusFirstTask],
+    ['shift+j', focusLastTask],
+
     // Project context menu actions
     ['alt+p', addProjectBelowCurrent],
     ['alt+shift+p', addProjectAboveCurrent],
@@ -225,80 +229,26 @@
    * Actions
    */
 
-  // Move the cursor up and down.
-  async function cursorDown() {
-    const cursorChanged = modifyCursorIndex((ix) => ix + 1);
-    if (!cursorChanged && isUpcomingView()) {
-      scrollTaskToTop(getCursor());
-    }
-  }
-  async function cursorUp() {
-    const cursorChanged = modifyCursorIndex((ix) => ix - 1);
-    if (!cursorChanged && isUpcomingView()) {
-      info('scrolling task to bottom');
-      scrollTaskToBottom(getCursor());
+  function focusFirstTask() {
+    const tasks = getTasks();
+    if (tasks.length > 0) {
+      focusTask(tasks[0]);
     }
   }
 
-  // Move the cursor to first / last task.
-  async function cursorFirst() {
-    disabledWithLazyLoading('Cursoring first task', () => {
-      setCursorToFirstTask('scroll');
-    });
-  }
-  async function cursorLast() {
-    disabledWithLazyLoading('Cursoring last task', () => {
-      setCursorToLastTask('scroll');
-    });
+  function focusLastTask() {
+    const tasks = getTasks();
+    if (tasks.length > 0) {
+      focusTask(tasks[tasks.length - 1]);
+    }
   }
 
-  async function cursorUpSection() {
-    disabledWithLazyLoading('Moving cursor up a section', () => {
-      const cursor = requireCursor();
-      let section = getSection(cursor);
-      section = findParent(section, matchingTag('li')) || section;
-      let firstTask = getFirstTaskIn(section);
-      if (firstTask && !sameElement(cursor)(firstTask)) {
-        // Not on first task, so move the cursor.
-        setCursor(firstTask, 'scroll');
-      } else {
-        // If already on the first task of this section, then select
-        // first task of prior populated section, if any exists.
-        section = section.previousSibling;
-        for (; section; section = section.previousSibling) {
-          firstTask = getFirstTaskIn(section);
-          if (firstTask) {
-            setCursor(firstTask, 'scroll');
-            return;
-          }
-        }
-      }
-    });
-  }
-
-  async function cursorDownSection() {
-    disabledWithLazyLoading('Moving cursor down a section', () => {
-      const cursor = requireCursor();
-      let startSection = getSection(cursor);
-      startSection =
-        findParent(startSection, matchingTag('li')) || startSection;
-      let section = startSection.nextSibling;
-      for (; section; section = section.nextSibling) {
-        debug('section = ', section);
-        const firstTask = getFirstTaskIn(section);
-        if (firstTask) {
-          setCursor(firstTask, 'scroll');
-          return;
-        }
-      }
-      // If execution has reached this point, then we must already be
-      // on the last section.
-      const lastTask = getLastTaskInSection(startSection);
-      warn('Already on last section. lastTask =', lastTask);
-      if (lastTask) {
-        setCursor(lastTask, 'scroll');
-      }
-    });
+  function focusTask(task) {
+    const body = task.querySelector('.task_list_item__body');
+    if (body) {
+      body.focus();
+      task.scrollIntoView({block: 'nearest'});
+    }
   }
 
   // Edit the task under the cursor.
@@ -722,23 +672,6 @@
         '[data-action-hint=task-toggle-collapse]');
   }
 
-  // Collapse cursor. If it is already collapsed, select and collapse parent.
-  async function cursorLeft() {
-    if (checkTaskExpanded(requireCursor())) {
-      toggleCollapse();
-    } else {
-      selectAndCollapseParent();
-    }
-  }
-
-  // Expand cursor and move down.
-  async function cursorRight() {
-    if (checkTaskCollapsed(requireCursor())) {
-      toggleCollapse();
-      cursorDown();
-    }
-  }
-
   // Collapses or expands task under the cursor, that have children. Does
   // nothing if it's already in the desired state.
 
@@ -766,7 +699,7 @@
         for (let j = i; j >= 0; j--) {
           task = tasks[j];
           if (getUnique(task, '.down')) {
-            setCursor(task, 'scroll');
+            focusTask(task);
             toggleCollapse(task);
             break;
           }
@@ -1519,7 +1452,7 @@
 
   async function openRandomTask() {
     const tasks = getTasks();
-    setCursor(tasks[Math.floor(Math.random()*tasks.length)], 'scroll');
+    focusTask(tasks[Math.floor(Math.random()*tasks.length)]);
     openTaskView();
   }
 
@@ -1811,7 +1744,7 @@
         debug('Initial attempt to select', selectAfterNavigate,
             'yielded', newEl);
         if (newEl) {
-          setCursor(newEl, 'scroll');
+          focusTask(newEl);
         } else {
           const taskId = selectAfterNavigate;
           setTimeout(() => {
@@ -1826,7 +1759,7 @@
         // Unfortunately after some poking around I couldn't figure out
         // how to implement this - I couldn't easily get a debugger
         // paused while the task is flashing yellow.
-        setCursorToFirstTask('no-scroll');
+        focusFirstTask();
       }
     }
   }
@@ -1837,7 +1770,7 @@
         'yielded', taskEl, '. ',
         retriesLeft, ' retries left.');
     if (taskEl) {
-      setCursor(taskEl, 'scroll');
+      focusTask(taskEl);
     } else if (retriesLeft > 1) {
       setTimeout(() => {
         persistentlySelectAfterNavigate(taskId, retriesLeft - 1);
@@ -2303,7 +2236,7 @@
     ensureCursor();
     const cursor = getCursor();
     if (cursor) {
-      scrollTaskIntoView(cursor);
+      cursor.scrollIntoView({block: 'nearest'});
     }
     updateCursorStyle();
     if (!task || task.classList.contains('on_drag')) {
@@ -3672,41 +3605,6 @@
    * Task cursor
    */
 
-  // Sets the cursor to the first task, if any exists.
-  function setCursorToFirstTask(shouldScroll) {
-    const tasks = getTasks();
-    if (tasks.length > 0) {
-      setCursor(tasks[0], shouldScroll);
-    }
-  }
-
-  // Sets the cursor to the last task, if any exists.
-  function setCursorToLastTask(shouldScroll) {
-    const tasks = getTasks();
-    if (tasks.length > 0) {
-      setCursor(tasks[tasks.length - 1], shouldScroll);
-    }
-  }
-
-  // DISABLED: Extension cursor handling removed - using native Todoist cursor
-  function setCursor(task, shouldScroll) {
-    // No-op: using native Todoist cursor instead
-  }
-
-  function scrollTaskIntoView(task) {
-    verticalScrollIntoView(task, 0, false, 0.5);
-  }
-
-  function scrollTaskToBottom(task) {
-    verticalScrollIntoView(task, 0, true, 1);
-    scrollTaskIntoView(task);
-  }
-
-  function scrollTaskToTop(task) {
-    verticalScrollIntoView(task, 0, true, 0);
-    scrollTaskIntoView(task);
-  }
-
   // Exception thrown by requireCursor.
   function CursorRequired() {
     this.message = 'Shortcut requires a cursored task, but none found.';
@@ -3727,49 +3625,6 @@
   // MODIFIED: Now returns the native Todoist selected task instead of extension cursor
   function getCursor() {
     return getNativeSelectedTask();
-  }
-
-  // A functional-ish idiom to reduce boilerplate.
-  function modifyCursorIndex(f) {
-    const tasks = getTasks();
-    let cursor = getCursor();
-    if (!cursor) {
-      debug('modifyCursorIndex couldn\'t find cursor, so restoreLastCursor');
-      restoreLastCursor();
-      cursor = getCursor();
-    }
-    let cursorChanged = false;
-    if (!cursor) {
-      info('Couldn\'t find cursor, so cursoring first task.');
-      setCursorToFirstTask('scroll');
-      cursorChanged = true;
-    } else {
-      const cursorIndex = tasks.indexOf(cursor);
-      if (cursorIndex < 0) {
-        error(
-            'Invariant violation: couldn\'t find', cursor, 'in', tasks,
-            ', so aborting modifyCursorIndex');
-        cursorFirst();
-        return false;
-      }
-      let newIndex = f(cursorIndex, tasks);
-      if (newIndex < 0) {
-        info('Can\'t move cursor before first task');
-        newIndex = 0;
-      }
-      if (newIndex >= tasks.length) {
-        info('Can\'t move cursor after last task');
-        newIndex = tasks.length - 1;
-      }
-      cursorChanged = newIndex !== cursorIndex;
-      if (cursorChanged) {
-        const newCursor = tasks[newIndex];
-        if (newCursor) {
-          setCursor(newCursor, 'scroll');
-        }
-      }
-    }
-    return cursorChanged;
   }
 
   // This function detects which mode Todoist's view is in, since each behaves a
