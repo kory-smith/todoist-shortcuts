@@ -253,45 +253,43 @@
     }
   }
 
+  function getCursorSection() {
+    const section = getSection(requireCursor());
+    return findParent(section, matchingTag('li')) || section;
+  }
+
+  function findFirstTaskInAdjacentSection(startSection, direction) {
+    const prop = direction === 'next' ? 'nextSibling' : 'previousSibling';
+    for (let s = startSection[prop]; s; s = s[prop]) {
+      const task = getFirstTaskIn(s);
+      if (task) return task;
+    }
+    return null;
+  }
+
   async function jumpToNextSection() {
     disabledWithLazyLoading('Jumping to next section', () => {
-      const cursor = requireCursor();
-      let startSection = getSection(cursor);
-      startSection =
-        findParent(startSection, matchingTag('li')) || startSection;
-      let section = startSection.nextSibling;
-      for (; section; section = section.nextSibling) {
-        const firstTask = getFirstTaskIn(section);
-        if (firstTask) {
-          focusTask(firstTask);
-          return;
-        }
-      }
-      // Already on last section — jump to its last task.
-      const lastTask = getLastTaskInSection(startSection);
-      if (lastTask) {
-        focusTask(lastTask);
+      const section = getCursorSection();
+      const task = findFirstTaskInAdjacentSection(section, 'next');
+      if (task) {
+        focusTask(task);
+      } else {
+        // Already on last section — jump to its last task.
+        const lastTask = getLastTaskInSection(section);
+        if (lastTask) focusTask(lastTask);
       }
     });
   }
 
   async function jumpToPreviousSection() {
     disabledWithLazyLoading('Jumping to previous section', () => {
-      const cursor = requireCursor();
-      let section = getSection(cursor);
-      section = findParent(section, matchingTag('li')) || section;
+      const section = getCursorSection();
       const firstTask = getFirstTaskIn(section);
-      if (firstTask && !sameElement(cursor)(firstTask)) {
+      if (firstTask && !sameElement(requireCursor())(firstTask)) {
         focusTask(firstTask);
       } else {
-        section = section.previousSibling;
-        for (; section; section = section.previousSibling) {
-          const prevFirst = getFirstTaskIn(section);
-          if (prevFirst) {
-            focusTask(prevFirst);
-            return;
-          }
-        }
+        const task = findFirstTaskInAdjacentSection(section, 'previous');
+        if (task) focusTask(task);
       }
     });
   }
