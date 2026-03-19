@@ -887,16 +887,22 @@
   async function focusAfterEditorClose(onClose) {
     const editor = document.querySelector('.task_editor') ||
       await getUniqueRetrying(document, '.task_editor');
-    if (!editor || !editor.parentElement) return;
+    if (!editor) return;
+    // Observe document.body (not editor.parentElement) because React
+    // may detach the parent when the editor transitions between tasks
+    // (e.g. Enter to create, then a new editor opens).
     const observer = new MutationObserver(() => {
       if (!document.querySelector('.task_editor')) {
-        observer.disconnect();
+        // Editor gone — but wait to see if a new one appears (Enter
+        // creates a task and immediately opens a new editor).
         setTimeout(() => {
+          if (document.querySelector('.task_editor')) return;
+          observer.disconnect();
           if (!getNativeSelectedTask()) onClose();
-        }, 50);
+        }, 100);
       }
     });
-    observer.observe(editor.parentElement, {childList: true, subtree: true});
+    observer.observe(document.body, {childList: true, subtree: true});
     setTimeout(() => observer.disconnect(), 60000);
   }
 
