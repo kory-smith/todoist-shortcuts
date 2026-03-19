@@ -25,9 +25,11 @@
     ['shift+o', addAbove],
     ['o', addBelow],
 
-    // Add project above/below current project
+    // Project context menu actions
     ['alt+p', addProjectBelowCurrent],
     ['alt+shift+p', addProjectAboveCurrent],
+    ['alt+a', archiveCurrentProject],
+    ['alt+d', deleteCurrentProject],
 
     // Utility
     ['shift+enter', followLink],
@@ -1016,18 +1018,26 @@
     setTimeout(updateKeymap, 10);
   }
 
-  async function addProjectRelativeToCurrent(menuItemText) {
+  async function clickCurrentProjectMenuItem(menuItemText) {
     await openCurrentProjectLeftNavMenu();
     await clickUniqueRetrying(
         document, '[role="menuitem"]', matchingText(menuItemText));
   }
 
   async function addProjectBelowCurrent() {
-    await addProjectRelativeToCurrent('Add project below');
+    await clickCurrentProjectMenuItem('Add project below');
   }
 
   async function addProjectAboveCurrent() {
-    await addProjectRelativeToCurrent('Add project above');
+    await clickCurrentProjectMenuItem('Add project above');
+  }
+
+  async function archiveCurrentProject() {
+    await clickCurrentProjectMenuItem('Archive');
+  }
+
+  async function deleteCurrentProject() {
+    await clickCurrentProjectMenuItem('Delete');
   }
 
   // Switches to a navigation mode, where navigation targets are annotated
