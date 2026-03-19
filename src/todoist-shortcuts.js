@@ -25,9 +25,11 @@
     ['shift+o', addAbove],
     ['o', addBelow],
 
-    // Jump to first/last task
+    // Jump to first/last task, or next/previous section
     ['shift+k', focusFirstTask],
     ['shift+j', focusLastTask],
+    ['}', jumpToNextSection],
+    ['{', jumpToPreviousSection],
 
     // Project context menu actions
     ['alt+p', addProjectBelowCurrent],
@@ -249,6 +251,49 @@
       body.focus();
       task.scrollIntoView({block: 'nearest'});
     }
+  }
+
+  async function jumpToNextSection() {
+    disabledWithLazyLoading('Jumping to next section', () => {
+      const cursor = requireCursor();
+      let startSection = getSection(cursor);
+      startSection =
+        findParent(startSection, matchingTag('li')) || startSection;
+      let section = startSection.nextSibling;
+      for (; section; section = section.nextSibling) {
+        const firstTask = getFirstTaskIn(section);
+        if (firstTask) {
+          focusTask(firstTask);
+          return;
+        }
+      }
+      // Already on last section — jump to its last task.
+      const lastTask = getLastTaskInSection(startSection);
+      if (lastTask) {
+        focusTask(lastTask);
+      }
+    });
+  }
+
+  async function jumpToPreviousSection() {
+    disabledWithLazyLoading('Jumping to previous section', () => {
+      const cursor = requireCursor();
+      let section = getSection(cursor);
+      section = findParent(section, matchingTag('li')) || section;
+      const firstTask = getFirstTaskIn(section);
+      if (firstTask && !sameElement(cursor)(firstTask)) {
+        focusTask(firstTask);
+      } else {
+        section = section.previousSibling;
+        for (; section; section = section.previousSibling) {
+          const prevFirst = getFirstTaskIn(section);
+          if (prevFirst) {
+            focusTask(prevFirst);
+            return;
+          }
+        }
+      }
+    });
   }
 
   // Edit the task under the cursor.
