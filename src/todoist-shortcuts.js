@@ -878,23 +878,43 @@
 
   function restoreFocusAfterEditorClose(task) {
     const taskId = getTaskId(task);
-    const editor = document.querySelector('.task_editor');
+    focusAfterEditorClose(() => {
+      const el = taskId ? getTaskById(taskId, 'ignore-indent') : task;
+      if (el) focusTask(el);
+    });
+  }
+
+  async function focusAfterEditorClose(onClose) {
+    const editor = document.querySelector('.task_editor') ||
+      await getUniqueRetrying(document, '.task_editor');
     if (!editor || !editor.parentElement) return;
     const observer = new MutationObserver(() => {
       if (!document.querySelector('.task_editor')) {
         observer.disconnect();
         setTimeout(() => {
-          if (!getNativeSelectedTask()) {
-            const el = taskId
-              ? getTaskById(taskId, 'ignore-indent')
-              : task;
-            if (el) focusTask(el);
-          }
+          if (!getNativeSelectedTask()) onClose();
         }, 50);
       }
     });
     observer.observe(editor.parentElement, {childList: true, subtree: true});
     setTimeout(() => observer.disconnect(), 60000);
+  }
+
+  async function focusLastTaskInEditorSectionAfterClose() {
+    const editor = document.querySelector('.task_editor') ||
+      await getUniqueRetrying(document, '.task_editor');
+    if (!editor) return;
+    // Capture the section while the editor is still in the DOM.
+    const section = editor.closest('li[data-is-active]') ||
+      editor.closest('ul') || editor.parentElement;
+    focusAfterEditorClose(() => {
+      const lastTask = getLastTaskInSection(section);
+      if (lastTask) {
+        focusTask(lastTask);
+      } else {
+        focusLastTask();
+      }
+    });
   }
 
   // Open comments sidepane
@@ -4655,7 +4675,13 @@
       const handled = mousetrap.handleKeyEvent(ev);
       // If mousetrap didn't handle the key, pass it to original Todoist handler
       if (!handled && window.originalTodoistKeydown) {
-        return window.originalTodoistKeydown.call(document, ev);
+        const result = window.originalTodoistKeydown.call(document, ev);
+        // When native 'a' opens the inline add-task editor, set up
+        // focus restore so Escape focuses the last task in that section.
+        if (ev.key === 'a' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+          focusLastTaskInEditorSectionAfterClose();
+        }
+        return result;
       }
       return handled;
     }
