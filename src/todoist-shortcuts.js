@@ -19,7 +19,7 @@
   // MINIMAL VERSION: Only g navigation + o/O (using native cursor)
   const KEY_BINDINGS = [
     // Navigation
-    ['g', navigate],
+    ['g', navigate, 'keydown'],
 
     // Add tasks above/below native focused task
     ['shift+o', addAbove],
@@ -4551,9 +4551,9 @@
 
   function registerKeybindings(keymap, binds) {
     for (let i = 0; i < binds.length; i++) {
-      if (binds[i].length === 2) {
-        // eslint-disable-next-line no-undefined
-        mousetrap.bind(binds[i][0], callBinding(binds[i]), undefined, keymap);
+      const [key, , action] = binds[i];
+      if (key && binds[i].length >= 2) {
+        mousetrap.bind(key, callBinding(binds[i]), action, keymap);
       } else {
         error('Improper binding entry at index', i, 'value is', binds[i]);
       }
