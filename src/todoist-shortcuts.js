@@ -906,7 +906,7 @@
     setTimeout(() => observer.disconnect(), 60000);
   }
 
-  async function focusLastTaskInEditorSectionAfterClose() {
+  async function focusEditorSectionTaskAfterClose(getTask, fallback) {
     const editor = document.querySelector('.task_editor') ||
       await getUniqueRetrying(document, '.task_editor');
     if (!editor) return;
@@ -914,11 +914,11 @@
     const section = editor.closest('li[data-is-active]') ||
       editor.closest('ul') || editor.parentElement;
     focusAfterEditorClose(() => {
-      const lastTask = getLastTaskInSection(section);
-      if (lastTask) {
-        focusTask(lastTask);
+      const task = getTask(section);
+      if (task) {
+        focusTask(task);
       } else {
-        focusLastTask();
+        fallback();
       }
     });
   }
@@ -4682,10 +4682,13 @@
       // If mousetrap didn't handle the key, pass it to original Todoist handler
       if (!handled && window.originalTodoistKeydown) {
         const result = window.originalTodoistKeydown.call(document, ev);
-        // When native 'a' opens the inline add-task editor, set up
-        // focus restore so Escape focuses the last task in that section.
-        if (ev.key === 'a' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
-          focusLastTaskInEditorSectionAfterClose();
+        // When native 'a'/'A' opens the inline add-task editor, set up
+        // focus restore so Escape focuses the nearest task in that section.
+        if ((ev.key === 'a' || ev.key === 'A') &&
+            !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+          focusEditorSectionTaskAfterClose(
+              ev.shiftKey ? getFirstTaskIn : getLastTaskInSection,
+              ev.shiftKey ? focusFirstTask : focusLastTask);
         }
         return result;
       }
