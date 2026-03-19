@@ -860,6 +860,7 @@
     const task = getNativeSelectedTask();
     if (task) {
       await addAboveTask(task);
+      restoreFocusAfterEditorClose(task);
     } else {
       info('No task selected - use arrow keys to select a task first');
     }
@@ -869,9 +870,30 @@
     const task = getNativeSelectedTask();
     if (task) {
       await addBelowTask(task);
+      restoreFocusAfterEditorClose(task);
     } else {
       info('No task selected - use arrow keys to select a task first');
     }
+  }
+
+  function restoreFocusAfterEditorClose(task) {
+    const taskId = task.getAttribute('data-item-id');
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('.task_editor')) {
+        observer.disconnect();
+        setTimeout(() => {
+          if (!getNativeSelectedTask()) {
+            const el = taskId
+              ? document.querySelector(
+                  '[data-item-id="' + taskId + '"]')
+              : task;
+            if (el) focusTask(el);
+          }
+        }, 50);
+      }
+    });
+    observer.observe(document.body, {childList: true, subtree: true});
+    setTimeout(() => observer.disconnect(), 60000);
   }
 
   // Open comments sidepane
