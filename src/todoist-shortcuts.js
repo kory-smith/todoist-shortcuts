@@ -25,6 +25,10 @@
     ['shift+o', addAbove],
     ['o', addBelow],
 
+    // Add project above/below current project
+    ['alt+p', addProjectBelowCurrent],
+    ['alt+shift+p', addProjectAboveCurrent],
+
     // Utility
     ['shift+enter', followLink],
     ['ctrl+,', copyCursorOrSelectedTitles],
@@ -982,8 +986,6 @@
     });
   }
 
-  // TODO: Fix this
-  // eslint-disable-next-line no-unused-vars
   async function openCurrentProjectLeftNavMenu() {
     if (leftNavIsHidden()) {
       toggleLeftNav();
@@ -992,34 +994,40 @@
     const currentProject = getUnique(
         document, '#left-menu-projects-panel li', (project) => {
           const link = getUnique(project, 'a');
-          // If a project doesn't have an anchor tag, it's hidden and
-          // we want to skip it.
           return link !== null && link.href.endsWith(currentPath);
         });
     if (!currentProject) {
       throw new Error('Could not find current project.');
     }
-    const projectButtons = selectAll(currentProject, 'button');
-    let moreProjectActionsButton = null;
-    switch (projectButtons.length) {
-      case 1:
-        moreProjectActionsButton = projectButtons[0];
-        break;
-      case 2:
-        // If a project has two buttons, the first is the "toggle
-        // collapse" button and the second is the "more actions"
-        // button.
-        moreProjectActionsButton = projectButtons[1];
-        break;
-      case 0:
-        throw new Error(
-            'Project element has no buttons (expected "more actions" button.');
-      default:
-        throw new Error(
-            'Project element has more than two buttons, which is unexpected.');
+    const moreActionsButton = getUnique(
+        currentProject, 'button[aria-label="More actions"]');
+    if (!moreActionsButton) {
+      throw new Error(
+          'Could not find "More actions" button for current project.');
     }
-    click(moreProjectActionsButton);
+    // Todoist's React handlers require a mouseover on the project li
+    // followed by a full pointer/mouse event sequence to open the menu.
+    // A simple el.click() only toggles aria-expanded without rendering
+    // the popup.
+    currentProject.dispatchEvent(new MouseEvent('mouseover', {
+      bubbles: true, cancelable: true, view: window, button: 0,
+    }));
+    dispatchClickSequence(moreActionsButton);
     setTimeout(updateKeymap, 10);
+  }
+
+  async function addProjectRelativeToCurrent(menuItemText) {
+    await openCurrentProjectLeftNavMenu();
+    await clickUniqueRetrying(
+        document, '[role="menuitem"]', matchingText(menuItemText));
+  }
+
+  async function addProjectBelowCurrent() {
+    await addProjectRelativeToCurrent('Add project below');
+  }
+
+  async function addProjectAboveCurrent() {
+    await addProjectRelativeToCurrent('Add project above');
   }
 
   // Switches to a navigation mode, where navigation targets are annotated
@@ -4107,6 +4115,17 @@
     debug('click() called on element:', el);
     // Use native click method
     el.click();
+  }
+
+  // Dispatches a full pointer/mouse click sequence on an element.
+  // Needed for React components that don't respond to el.click().
+  function dispatchClickSequence(el) {
+    const opts = {bubbles: true, cancelable: true, view: window, button: 0};
+    el.dispatchEvent(new PointerEvent('pointerdown', opts));
+    el.dispatchEvent(new MouseEvent('mousedown', opts));
+    el.dispatchEvent(new PointerEvent('pointerup', opts));
+    el.dispatchEvent(new MouseEvent('mouseup', opts));
+    el.dispatchEvent(new MouseEvent('click', opts));
   }
 
   // Sum offsetTop / offsetLeft of all offsetParent to compute x / y.
