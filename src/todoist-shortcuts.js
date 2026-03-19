@@ -877,22 +877,23 @@
   }
 
   function restoreFocusAfterEditorClose(task) {
-    const taskId = task.getAttribute('data-item-id');
+    const taskId = getTaskId(task);
+    const editor = document.querySelector('.task_editor');
+    if (!editor || !editor.parentElement) return;
     const observer = new MutationObserver(() => {
       if (!document.querySelector('.task_editor')) {
         observer.disconnect();
         setTimeout(() => {
           if (!getNativeSelectedTask()) {
             const el = taskId
-              ? document.querySelector(
-                  '[data-item-id="' + taskId + '"]')
+              ? getTaskById(taskId, 'ignore-indent')
               : task;
             if (el) focusTask(el);
           }
         }, 50);
       }
     });
-    observer.observe(document.body, {childList: true, subtree: true});
+    observer.observe(editor.parentElement, {childList: true, subtree: true});
     setTimeout(() => observer.disconnect(), 60000);
   }
 
