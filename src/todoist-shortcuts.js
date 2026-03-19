@@ -269,6 +269,10 @@
 
   async function jumpToNextSection() {
     disabledWithLazyLoading('Jumping to next section', () => {
+      if (!getCursor()) {
+        focusFirstTask();
+        return;
+      }
       const section = getCursorSection();
       const task = findFirstTaskInAdjacentSection(section, 'next');
       if (task) {
@@ -283,6 +287,10 @@
 
   async function jumpToPreviousSection() {
     disabledWithLazyLoading('Jumping to previous section', () => {
+      if (!getCursor()) {
+        focusFirstTask();
+        return;
+      }
       const section = getCursorSection();
       const firstTask = getFirstTaskIn(section);
       if (firstTask && !sameElement(requireCursor())(firstTask)) {
