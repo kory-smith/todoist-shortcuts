@@ -36,6 +36,7 @@
     ['alt+shift+p', addProjectAboveCurrent],
     ['alt+a', archiveCurrentProject],
     ['alt+d', deleteCurrentProject],
+    ['shift+c', openProjectComments],
 
     // Utility
     ['shift+enter', followLink],
@@ -1071,6 +1072,10 @@
 
   async function deleteCurrentProject() {
     await clickCurrentProjectMenuItem('Delete');
+  }
+
+  async function openProjectComments() {
+    clickUnique(document, 'a[data-note-type="project_note"][aria-label="Comments"]');
   }
 
   // Switches to a navigation mode, where navigation targets are annotated
